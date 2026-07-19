@@ -12,50 +12,27 @@ remote-control platform running across a fleet of utility-scale solar plants in 
 
 ## The platform, end to end
 
-```mermaid
-flowchart LR
-    subgraph PLANT["Solar plant — on-site"]
-        HW["Inverters · Protection relays<br/>Weather stations · Energy meters"]
-        COLL["Edge collector (Python)<br/>Modbus TCP polling · fault detection<br/>local TimescaleDB buffer"]
-        HW -- "Modbus TCP" --> COLL
-    end
-
-    subgraph CLOUD["Cloud"]
-        API["FastAPI + TimescaleDB<br/>fleet telemetry ingestion<br/>energy-loss attribution engine"]
-        FE["React 19 + TypeScript dashboard<br/>operations · reporting · fleet health"]
-        API --> FE
-    end
-
-    COLL -- "token-auth ingestion (HTTP)" --> API
-    API -. "control rail: WebSocket + poll<br/>2FA-gated commands · OTA updates" .-> COLL
-```
-
 **Edge.** A containerized Python collector per plant, with a multi-vendor device layer:
-register maps and drivers for inverters (Sungrow, Huawei, GoodWe), protection relays,
-thermal relays, weather stations, energy meters and RS-485 gateways — plus an automatic
-fault-detection state machine and polling built to survive flaky field networks.
+register maps and drivers for inverters, protection relays, thermal relays, weather
+stations, energy meters and RS-485 gateways. A fault-detection state machine follows each
+inverter through its daily lifecycle, and polling is built for unreliable field networks.
 
-**Cloud API.** FastAPI on PostgreSQL/TimescaleDB — high-write time-series ingestion and
-an idempotent, replay-safe energy-loss attribution engine using peer-baseline modeling.
-Traced a production database cost overrun to unindexed read paths rather than write
-volume, and returned spend to baseline with targeted indexes and query rewrites.
+**Cloud API.** Ingests telemetry from every plant and serves monitoring, generation
+reports, alerting, and energy-loss attribution against a peer baseline — idempotent and
+replay-safe.
 
-**Remote operations.** An audited command rail — idempotency keys, claim timeouts,
-WebSocket and HTTP transports, TOTP two-factor step-up — covering configuration and
-power state for plant equipment, so routine intervention no longer requires sending
-someone to the plant. Collectors update themselves over the same rail, delegating a
-detached container recreate to the Docker daemon so the update survives the restart it
-triggers.
+**Remote operations.** An audited command rail carries operator actions to plant
+equipment — configuration and power state, every mutation authenticated, two-factor
+gated, and logged end to end. Collectors update themselves over the same rail.
 
-**Frontend.** React 19 + TypeScript + Vite dashboard — real-time monitoring, generation
-and availability reporting, breakdown management, fleet-health administration. The daily
-working surface for plant operators.
+**Frontend.** The daily working surface for plant operators: real-time monitoring,
+generation and availability reporting, breakdown management, and fleet health.
 
-**Delivery.** Commit → pytest → GitHub Actions multi-arch image builds → cloud
-auto-deploy and Ansible fleet deployment → centralized logging.
+**Delivery.** From commit to a running plant: automated tests, image builds, cloud
+deploys, and Ansible fleet rollout, with centralized logging across all sites.
 
-**Field tooling.** A commissioning app technicians run inside the plant network to probe
-and validate any Modbus device before go-live.
+**Field tooling.** A desktop tool technicians run inside the plant network to probe and
+validate any device before go-live.
 
 ---
 
